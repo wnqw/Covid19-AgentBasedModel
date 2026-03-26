@@ -147,6 +147,8 @@ What gets sampled:
 
 This repository is an Eclipse-era project that expects the external MASON libraries on the classpath.
 
+Download MASON here: `https://people.cs.gmu.edu/~eclab/projects/mason/`
+
 The module definition indicates dependencies on:
 
 * `MASON`
