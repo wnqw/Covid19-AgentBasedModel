@@ -1,6 +1,6 @@
 # An Agent Based Model on Covid-19 Transmission Dynamics
 
-[![PDF](https://img.shields.io/badge/Paper-Paper-CC0000.svg)](Covid19AgentBasedModel.pdf)
+[![PDF](https://img.shields.io/badge/Paper-Paper-CC0000.svg)](https://drive.google.com/file/d/1Vhher3hPqq_Lii5ZnI6hIYY1yFrJMkIs/view?usp=drive_link)
 
 <p align="center">
   <br />
