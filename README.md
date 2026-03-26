@@ -1,161 +1,168 @@
-# An Agent Based Model on Covid-19 Transmission Dynamics
+# COVID-19 Agent-Based Model
 
-[![PDF](https://img.shields.io/badge/Paper-Paper-CC0000.svg)](https://drive.google.com/file/d/1Vhher3hPqq_Lii5ZnI6hIYY1yFrJMkIs/view?usp=drive_link)
+[![Paper](https://img.shields.io/badge/Paper-PDF-CC0000.svg)](./Covid19AgentBasedModel.pdf)
 
 <p align="center">
-  <br />
-  <img src="assets/teaser.png" width="100%" />
-  <br />
+  <img src="assets/teaser.png" width="100%" alt="Model teaser" />
 </p>
 
-This repository contains an agent-based model (ABM) for COVID-19 transmission dynamics based on the paper:
+This repository contains a agent-based model for simulating COVID-19 transmission in a moving population. The implementation is centered on a spatial SEIR-style process with reinfection, optional interventions, and parameter sweeps for repeated experiments.
 
-> **An Agent Based Model on Covid-19 Transmission Dynamics**  
-> [Wenqing Wang](https://wenqing-wang.netlify.app/)  
-> UC Davis, 2019
+The code accompanies the paper _An Agent Based Model on Covid-19 Transmission Dynamics_ by [Wenqing Wang](https://wenqing-wang.netlify.app/).
 
-## What’s implemented
+## Quick start
 
-At a high level this project simulates a spatial SEIR-style process with extra states:
+If you already have the required jars available, the shortest path is:
 
-* `Susceptible`: agent can become exposed if it is within `distance` of an infectious agent.
-* `Exposed`: exposed countdown (`explosedPhase`) before becoming infectious.
-* `Infectious`: infectious countdown (`infectiousPhase`) before recovering or dying.
-* `Recovered`: recovered countdown (`recoveredPhase`) before returning to `Susceptible` (reinfection possible).
-* `Dead`: removed from the simulation (or left visible if `showDeadAgents` is enabled).
+1. Download MASON from the official site: <https://people.cs.gmu.edu/~eclab/projects/mason/>.
+2. Add `mason.22.jar` to your Java project's classpath.
+3. Add the MASON support libraries from the same page if you want charts, PDF export, or movie output.
+4. Add the extra non-core jars or source folders that provide `sweep.*`, `spaces.*`, `groups.*`, `observer.*`, and `randomWalker.*`.
+5. Import this repository as a Java project and mark `src/` as a source folder.
+6. Set the working directory to the repository root so `runTimeFile.txt` can find `script.txt`.
+7. Run `NetworkModel.GUICN`.
 
-The simulation is driven by `NetworkModel.GUICN` (GUI entry point) and `NetworkModel.Environment` (simulation state). The individual agent logic lives in `NetworkModel.Agent`.
+If you only add `mason.22.jar`, the `sim.*` imports will resolve, but this project still will not compile until the additional non-core packages above are also on the classpath.
 
-## Spatial + contact rule (infection)
+## Install MASON
 
-Each simulation step, a susceptible agent:
+According to the official MASON page, the current binary distribution is `mason.22.jar`:
 
-1. Queries all neighbors within `distance` (agents at exactly within range).
-2. Skips exposure if `testing` is enabled and the susceptible is `quarantine` (and also skips if the infectious neighbor is quarantined).
-3. For each infectious neighbor:
-   * If the two agents are in different groups, exposure uses probability `pExpNoneG`.
-   * If both are in the same family group (`Groups.FAMILY`), exposure uses probability `pExpFamilyG`.
-4. The base exposure probability is modified by agent factors in `Agent.agentFactors(...)`, including:
-   * Age mixing: `youngerP` or `elderP` depending on `elderAgeDefine`.
-   * Supplements (`takeSupplements` random flag) reduce exposure by `(1 - supplementP)`.
-   * Masks (boolean `mask`) reduce exposure by `(1 - maskP)`.
-   * Optional mutation: may increase exposure by `(1 + mutationLevel)` with probability `mutationRate` (guarded so the result does not exceed 1).
-   * Optional vaccination: if `vaccine` is enabled and the agent is vaccinated, exposure becomes 0 after the vaccine takes effect (`countdownVacTakesEffect`).
+- Download `mason.22.jar` from <https://people.cs.gmu.edu/~eclab/projects/mason/>.
+- Add it to your classpath.
+- Download the support libraries linked on the same page and add those jars too if you need MASON to generate movies, charts, or PDF files.
+- Download the MASON manual from the same page if you want the full setup and tutorial documentation.
 
-## Disease progression (exposed -> infectious -> recover/death)
+For 3D simulations, the MASON page says you also need Java3D 1.6 libraries:
 
-Countdowns are handled per-agent:
+- `j3dcore.jar`
+- `j3dutils.jar`
+- `vecmath.jar`
+- `jogamp-fat.jar`
 
-* Exposed countdown: `explosedPhase` (note: spelling matches the code as `explosedPhase`).
-* Infectious countdown: `infectiousPhase`.
-* Recovered countdown: `recoveredPhase`.
+This repository appears to use a 2D continuous-space GUI, so the 3D libraries are not the first thing to install unless your local setup specifically requires them.
 
-When the infectious countdown reaches 0:
+## What the model simulates
 
-* If `age >= elderAgeDefine`, death happens with probability `elderDeathRate`; otherwise the agent recovers.
-* If `age < elderAgeDefine`, death happens with probability `deathRate`; otherwise the agent recovers.
+Each agent moves in a 2D continuous space and occupies one of five disease states:
 
-Recovered agents eventually return to `Susceptible` and `setInfectiousEnd()` is called (this is used by the provided `Experimenter` logic for dynamic R0 calculation, though R0 output is currently commented out in `Experimenter`).
+- `Susceptible`
+- `Exposed`
+- `Infectious`
+- `Recovered`
+- `Dead`
 
-## Groups / networks (family)
+The main progression is:
 
-Agents are assigned a `Groups` value by `Environment.decideGroup()`:
+1. Susceptible agents check nearby neighbors within an infection radius.
+2. Exposure probability depends on contact context and agent attributes.
+3. Exposed agents become infectious after a countdown.
+4. Infectious agents either recover or die, with different death rates for elder agents.
+5. Recovered agents return to `Susceptible`, so reinfection is possible.
 
-* `Groups.FAMILY` is selected with probability 0.5.
-* Otherwise group is `null` (treated as “not family” in group logic).
+## Built-in mechanisms
 
-If `showNetworks` is enabled:
+The current code supports the following features:
 
-* `Environment.makeNWG()` builds a `NetworkGroup` containing family agents only.
-* The network is generated with `randomNetworkMeanK(...)` using `meanK`.
-* `GUICN` visualizes this spatial network (edges + agent positions).
+- Spatial movement with either uniform or Gaussian steps.
+- Family-group contacts through `Groups.FAMILY`, with separate exposure probabilities for family vs. non-family interactions.
+- Mask use and social approval dynamics.
+- Testing and quarantine.
+- Vaccination with two-dose logic and delayed effect.
+- Mutation-driven increases in exposure probability.
+- Optional network visualization for family-group links.
 
-If an agent dies and `showNetworks` is enabled, it is removed from the network group as well.
+## Repository layout
 
-## Movement
+- `src/NetworkModel/Environment.java`: simulation state, parameters, agent creation, and run startup.
+- `src/NetworkModel/Agent.java`: agent behavior, movement, infection logic, vaccination, testing, and state transitions.
+- `src/NetworkModel/GUICN.java`: GUI entry point.
+- `src/NetworkModel/Experimenter.java`: periodic data collection for simulation outputs.
+- `script.txt`: parameter sweep script and default runtime parameters.
+- `runTimeFile.txt`: runtime config for script name, output folder, output file, and column headers.
+- `Covid19AgentBasedModel.pdf`: paper associated with the model.
+- `figs/`: exported figures and example outputs.
 
-Agents move in continuous 2D space:
+## Running the model
 
-* Movement happens with probability controlled by `active`.
-* Step direction:
-  * If `gaussian` is true, `GaussianStep()` uses `randomOrientedGaussianStep(...)`.
-  * Otherwise `UniformStep()` uses `randomOrientedUniformStep(...)`.
-* Movement step size is controlled by `stepSize`.
-* `rotation` affects movement orientation sampling.
+This repository does not include Gradle, Maven, or Ant build files, and it does not vendor its Java dependencies. The project is set up like an IDE-managed Java project that expects external simulation libraries on the classpath.
 
-If `testing` is enabled:
+To run it:
 
-* Quarantined agents follow the `quarantine()` logic (they are kept in place while the countdown runs).
+1. Import the repository as a Java project in your IDE, or compile it manually with an explicit classpath.
+2. Add `mason.22.jar` plus any required MASON support libraries from the official MASON site: <https://people.cs.gmu.edu/~eclab/projects/mason/>.
+3. Add the external libraries or source folders that provide the non-core imports used here: `sweep.*`, `spaces.*`, `groups.*`, `observer.*`, and `randomWalker.*`.
+4. Ensure the `sim.*` imports resolve from MASON and the remaining imports resolve from your companion library set.
+5. Use the repository root as the working directory so `runTimeFile.txt` can resolve `script.txt`.
+6. Launch `NetworkModel.GUICN`.
 
-## Optional interventions
+The GUI entry point is:
 
-The following switches are controlled by booleans in `NetworkModel.Environment` and expected to be provided via `script.txt` for parameter sweeps:
+```java
+src/NetworkModel/GUICN.java
+```
 
-* Social approval / masking:
-  * If `SocApproval` is enabled, `Agent.socApproval()` may turn the agent’s `mask` on when their `approval` drops below `approvalBaseline`.
-  * Interactions can apply a penalty (`socPenalty`) to agents without masks when the other agent has a mask.
-* Testing and quarantine:
-  * If `testing` is enabled, `Agent.testing()` toggles `quarantine` for infectious agents after `countdownTest`.
-  * Quarantine lasts for `countdownQuarantine`.
-* Vaccine:
-  * If `vaccine` is enabled, vaccination proceeds in two doses.
-  * Dose uptake is probabilistic and limited by `vaccineCoverage`.
-  * After dose 2 is received, exposure becomes 0 after `countdownVacTakesEffect` (unless the code path is still on the countdown).
-  * If `elderFirst` is enabled, only elders receive vaccination first (younger agents are blocked until elders are eligible).
-* Mutation:
-  * If `mutation` is enabled, mutation can increase an agent’s exposure probability using `mutationRate` and `mutationLevel`.
+Its `main` method initializes:
 
-## GUI entry point
+- `Environment` as the simulation state
+- `Experimenter` as the observer / data collector
+- `GUICN` as the visualization layer
 
-Run the GUI main in `NetworkModel.GUICN`:
+## Configuration
 
-* `NetworkModel/GUICN.java` contains `public static void main(String[] args)` which calls `GUICN.initialize(...)`.
+Two root-level files drive most runs:
 
-The GUI expects a MASON-style `index.html` next to the simulation output:
+- `runTimeFile.txt`
+- `script.txt`
 
-* Source: `PandemicModel/src/NetworkModel/index.html`
-* Compiled output (existing): `PandemicModel/bin/NetworkModel/index.html`
+`runTimeFile.txt` selects the sweep script, output location, output file name, precision, and output columns.
 
-## Parameter sweeps + outputs
+`script.txt` defines the simulation parameters. It also supports parameter sweeps: the first three parameters with multiple comma-separated values are expanded into a Cartesian product of experiment settings.
 
-This project is set up for parameter sweeps using MASONplus-style `SimStateSweep` / `GUIStateSweep`.
+Example:
 
-Two configuration files are provided inside the nested project directory `PandemicModel/`:
+```java
+public boolean testing = false, true;
+```
 
-* `PandemicModel/runTimeFile.txt`
-  * Points to `script.txt` via `Scriptname: script.txt`
-  * Defines the output folder and file name (`DataFolder: data`, `DataFile: results.txt`)
-  * Defines column headers (see `ColumnHeaders:` line)
-  * Controls behavior like `Precision:` and `stopWhenNoAgents:`
-* `PandemicModel/script.txt`
-  * Defines the parameters for `NetworkModel.Environment`
-  * Supports sweeping up to 3 parameters by listing comma-separated values after a parameter (for example: `public boolean testing = false, true;`)
+Important parameters exposed in `script.txt` include:
 
-Data output location:
+- initial population counts: `susceptible`, `infected`
+- interventions: `SocApproval`, `mutation`, `vaccine`, `testing`
+- quarantine timing: `countdownTest`, `countdownQuarantine`
+- vaccination behavior: `vaccineCoverage`, `elderFirst`
+- run controls: `simLength`, `simNumber`, `dataSamplingInterval`
+- output names: `fileDataName`, `folderDataName`
 
-* `PandemicModel/data/` (based on `runTimeFile.txt`)
+## Output data
 
-What gets sampled:
+`Experimenter` samples the simulation every `dataSamplingInterval` steps and writes the fields listed in `runTimeFile.txt`.
 
-* `NetworkModel.Experimenter` samples agent counts every `dataSamplingInterval` steps and writes fractions of the total population:
-  * `total`
-  * `susceptible`, `exposed`, `infected`, `recovered`, `dead`
-  * `wearMask`
-  * `expByFam`, `expByNoneFam`
+The default output columns are:
 
-## Project dependencies (important)
+- `total`
+- `susceptible`
+- `exposed`
+- `infected`
+- `recovered`
+- `dead`
+- `wearMask`
+- `expByFam`
+- `expByNoneFam`
 
-This repository is an Eclipse-era project that expects the external MASON libraries on the classpath.
+By default, `runTimeFile.txt` points results to:
 
-Download MASON here: `https://people.cs.gmu.edu/~eclab/projects/mason/`
+```text
+data/results.txt
+```
 
-The module definition indicates dependencies on:
+## Current code behavior to know about
 
-* `MASON`
-* a `MASONplus...` variant (the project references plus modules via `.classpath` / `.iml`)
-* Java (configured for Java 12 in the `.classpath` / `.iml`)
+The README used to describe a nested project layout that is not present in this checkout. The actual repository is flat, with `src/`, `script.txt`, and `runTimeFile.txt` at the root.
 
-To build/run:
+Also, `Environment.start()` currently hardcodes the simulation space to a `200 x 200` continuous space:
 
-* Import the nested `PandemicModel/` folder as an Eclipse project (or otherwise ensure the `MASON` and `MASONplus` source/modules are available on the classpath).
+- `gridWidth` and `gridHeight` are reset to `200`
+- `spaces` is forced to `Spaces.CONTINUOUS`
 
+That means the `gridWidth`, `gridHeight`, and `nameSpace` values in `script.txt` are not currently controlling the runtime space configuration.
